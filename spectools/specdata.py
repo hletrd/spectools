@@ -9,6 +9,11 @@ from astropy import stats
 
 from skimage.feature import peak_local_max
 
+from astropy.modeling.fitting import LevMarLSQFitter
+from astropy.modeling.models import Gaussian1D, Chebyshev2D
+
+from numpy.polynomial.chebyshev import chebfit, chebval
+
 if __name__ == "__main__":
 	pass
 
@@ -16,34 +21,41 @@ class SpecData(CCDData):
 	err_str = {
 		'no_data': 'No data exists!',
 		'unsupported_axis': 'invalid axis values!',
-		'dimension': 'Dimensions of the array do not match!'
+		'dimension': 'Dimensions of the array do not match!',
+		'no_fitter': 'Undefined fitter!'
 	}
 
 	class Fitter:
 		def __init__(self):
 			self._const_Gaussian = 0
+			self._const_Chebyshev = 1
 			pass
 
 		@property
 		def Gaussian(self):
 			return self._const_Gaussian
+		
+		@property
+		def Chebyshev(self):
+			return self._const_Chebyshev
 
 		@Gaussian.setter
 		def Gaussian(self, val):
 			pass
 
-		from astropy.modeling.fitting import LevMarLSQFitter
-		from astropy.modeling.models import Gaussian1D, Chebyshev2D
-
-		from numpy.polynomial.chebyshev import chebfit, chebval
+		@Chebyshev.setter
+		def Chebyshev(self, val):
+			pass
 
 		@staticmethod
 		def fit_gauss(self, data, identified, peaks, fwhm=4):
 			peak_fitted = []
 			fitter = LevMarLSQFitter()
+			x_identify = np.arange(0, len(identified))
+
 			for peak in peaks:
 				g_init = Gaussian1D(
-					amplitude=identified,
+					amplitude=identified[peak],
 					mean=peak,
 					stddev=fwhm * stats.gaussian_fwhm_to_sigma,
 					bounds={
@@ -51,8 +63,8 @@ class SpecData(CCDData):
 						'mean':(peak-fwhm, peak+fwhm),
 						'stddev':(0, fwhm)
 						})
-				identified_x = np.arange(0, len(identified))
-				fitted = LINE_FITTER(g_init, identified_x, identified)
+
+				fitted = fitter(g_init, x_identify, identified)
 				peak_fitted.append(fitted.mean.value)
 
 			return peak_fitted
@@ -152,7 +164,7 @@ class SpecData(CCDData):
 		axis_target=0, #axis to find peak
 		size_slit=10, #size of the slit
 		min_separation=5, #minimum separation between peaks
-		sigma_clip=True, #if to perform sigma clip before finding peaks
+		sigma_clip=False, #if to perform sigma clip before finding peaks
 		sigma_value=3, #sigma value to clip
 		minamp_peak=0.01, #minimum amplitude to regard as peak
 		):
@@ -170,7 +182,8 @@ class SpecData(CCDData):
 			SpecData.raise_error(self, SpecData.err_str['unsupported_axis'])
 			return
 
-		identified_original = identified
+
+		self.identified = identified
 		if sigma_clip == True:
 			identified = stats.sigma_clip(identified, sigma=sigma_value, iters=5)
 		max_intensity = np.max(identified)
@@ -183,11 +196,15 @@ class SpecData(CCDData):
 			threshold_abs=max_intensity * minamp_peak
 			)
 
-		return peaks
+		return identified, peaks, max_intensity
 
 	#using CCDData of instance
-	def fit(self, init, fitter=0):
+	def fit(self, identified, init, fitter=0):
 		if self.ccddata == []:
 			SpecData.raise_error(self, SpecData.err_str['no_data'])
 		if fitter == self.Fitter.Gaussian:
-			self.Fitter.fit_gauss(init)
+			result = SpecData.Fitter.fit_gauss(self, self.ccddata.data, identified, init)
+		else:
+			SpecData.raise_error(self, SpecData.err_str['no_fitter'])
+		return result
+
