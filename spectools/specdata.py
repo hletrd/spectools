@@ -174,8 +174,6 @@ class SpecData(CCDData):
 		length_target = self.get_length(axis=axis_target)
 		search_min = length_target//2 - size_slit//2 
 		search_max = length_target//2 + size_slit//2
-		search_min = 0
-		search_max = 1
 
 		if axis_target == 0:
 			identified = np.median(self.ccddata[search_min:search_max, :], axis=axis_target)
