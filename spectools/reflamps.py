@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import numpy as np
 
 if __name__ == "__main__":
 	pass
@@ -6,7 +7,7 @@ if __name__ == "__main__":
 class RefLamps:
 
 	def __init__(self):
-		self._const_neon = [
+		self._const_neon = np.array([
 			3369.9,
 			3417.9035,
 			3447.7,
@@ -82,12 +83,28 @@ class RefLamps:
 			10798.12,
 			10844.54,
 			11143.02
-		]
+		])
+
+		self._const_hydrogen = np.array([
+			4101.74,
+			4340.47,
+			4861.33,
+			6562.852
+		])
 
 	@property
 	def neon(self):
 		return self._const_neon
 
+	@property
+	def hydrogen(self):
+		return self._const_hydrogen
+
 	@neon.setter #mimic the behavior of constant
 	def neon(self, val):
 		pass
+
+	@hydrogen.setter #mimic the behavior of constant
+	def hydrogen(self, val):
+		pass
+

@@ -22,7 +22,7 @@ class SpecData(CCDData):
 		'no_data': 'No data exists!',
 		'unsupported_axis': 'invalid axis values!',
 		'dimension': 'Dimensions of the array do not match!',
-		'no_fitter': 'Undefined fitter!'
+		'slit_size': 'Slit size out of range!'
 	}
 
 	class Fitter:
@@ -65,7 +65,7 @@ class SpecData(CCDData):
 						})
 
 				fitted = fitter(g_init, x_identify, identified)
-				peak_fitted.append(fitted.mean.value)
+				peak_fitted.append(fitted.mean.value[0])
 
 			return peak_fitted
 
@@ -80,13 +80,14 @@ class SpecData(CCDData):
 				deg=deg,
 				full=True
 				)
-			fitted_rms = np.sqrt(fitted_full[0][0]/cnt_data)
+			#fitted_rms = np.sqrt(fitted_full[0][0]/cnt_data)
 			rough_error = np.ptp(wavelengths) / np.ptp(pixels) / 2
 			residual = (wavelengths - chebval(pixels, coeff_id))
 			range_residual = np.max(np.abs(residual))
 
 			return {
 				'pixels': pixels,
+				'coeff': coeff_id,
 				'residual': residual,
 				'rough_error': rough_error,
 				'range_residual': range_residual,
@@ -146,7 +147,7 @@ class SpecData(CCDData):
 	def reduce_axis(self, axis):
 		if self.ccddata == []:
 			SpecData.raise_error(self, SpecData.err_str['no_data'])
-		self.ccddata = CCDData(self.ccddata.data.sum(axis=axis), unit='adu')
+		return SpecData(ccddata=CCDData(self.ccddata.data.sum(axis=axis), unit='adu'))
 
 	def get_data(self):
 		if self.ccddata == []:
@@ -173,6 +174,8 @@ class SpecData(CCDData):
 		length_target = self.get_length(axis=axis_target)
 		search_min = length_target//2 - size_slit//2 
 		search_max = length_target//2 + size_slit//2
+		search_min = 0
+		search_max = 1
 
 		if axis_target == 0:
 			identified = np.median(self.ccddata[search_min:search_max, :], axis=axis_target)
@@ -198,13 +201,31 @@ class SpecData(CCDData):
 
 		return identified, peaks, max_intensity
 
-	#using CCDData of instance
-	def fit(self, identified, init, fitter=0):
+	def linap(self, sum_axis=0, center=100, size=10):
 		if self.ccddata == []:
 			SpecData.raise_error(self, SpecData.err_str['no_data'])
-		if fitter == self.Fitter.Gaussian:
-			result = SpecData.Fitter.fit_gauss(self, self.ccddata.data, identified, init)
+		range_min = int(center - size//2)
+		range_max = int(center + size//2)
+		if (range_min < 0 or range_max >= self.get_length(sum_axis)):
+			SpecData.raise_error(self, SpecData.err_str['slit_size'])
+		if sum_axis == 1:
+			apall = np.sum(self.ccddata[:, range_min:range_max], axis=1)
+		elif sum_axis == 0:
+			apall = np.sum(self.ccddata[range_min:range_max, :], axis=0)
 		else:
-			SpecData.raise_error(self, SpecData.err_str['no_fitter'])
+			SpecData.raise_error(self, SpecData.err_str['unsupported_axis'])
+		return apall
+
+	#using CCDData of instance
+	def fit_gauss(self, identified, init):
+		if self.ccddata == []:
+			SpecData.raise_error(self, SpecData.err_str['no_data'])
+		result = SpecData.Fitter.fit_gauss(self, self.ccddata.data, identified, init)
+		return result
+
+	def fit_chebyshev(self, pixels, wavelengths, deg=4):
+		if self.ccddata == []:
+			SpecData.raise_error(self, SpecData.err_str['no_data'])
+		result = SpecData.Fitter.fit_chebyshev(self, pixels, wavelengths, deg)
 		return result
 
